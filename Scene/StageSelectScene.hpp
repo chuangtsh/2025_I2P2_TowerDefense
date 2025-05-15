@@ -16,9 +16,9 @@ public:
     void PlayOnClick(int stage);
     void ScoreboardOnClick();
     void BackOnClick(int stage);
-
-    void BGMSlideOnValueChanged(float value);
-    void SFXSlideOnValueChanged(float value);
+    // the following two should be deleted, right?
+    // void BGMSlideOnValueChanged(float value);
+    // void SFXSlideOnValueChanged(float value);
 };
 
 #endif   // STAGESELECTSCENE_HPP

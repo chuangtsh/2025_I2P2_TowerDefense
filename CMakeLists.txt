@@ -25,6 +25,8 @@ add_executable(2025_I2P2_TowerDefense
     Enemy/Enemy.hpp
     Enemy/SoldierEnemy.cpp
     Enemy/SoldierEnemy.hpp
+    Enemy/PlaneEnemy.cpp
+    Enemy/PlaneEnemy.hpp
     Enemy/TankEnemy.cpp
     Enemy/TankEnemy.hpp
 
@@ -54,10 +56,13 @@ add_executable(2025_I2P2_TowerDefense
     Engine/Sprite.hpp
     
     # TODO HACKATHON-2 (3/3): Add the new scene source files here
+    # finished(?)
     Scene/LoseScene.cpp
     Scene/LoseScene.hpp
     Scene/PlayScene.cpp
     Scene/PlayScene.hpp
+    Scene/SettingsScene.cpp
+    Scene/SettingsScene.hpp
     Scene/StageSelectScene.cpp
     Scene/StageSelectScene.hpp
     Scene/StartScene.cpp

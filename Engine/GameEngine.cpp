@@ -97,6 +97,7 @@ namespace Engine {
                 case ALLEGRO_EVENT_KEY_DOWN:
                     // Event for keyboard key down.
                     LOG(VERBOSE) << "Key with keycode " << event.keyboard.keycode << " down";
+                    // LOG(INFO) << "Key with keycode " << event.keyboard.keycode << " down";
                     activeScene->OnKeyDown(event.keyboard.keycode);
                     break;
                 case ALLEGRO_EVENT_KEY_UP:
@@ -106,7 +107,9 @@ namespace Engine {
                     break;
                 case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
                     // Event for mouse key down.
+                    // test what differ between VerBose and INFO
                     LOG(VERBOSE) << "Mouse button " << event.mouse.button << " down at (" << event.mouse.x << ", " << event.mouse.y << ")";
+                    // LOG(INFO) << "Mouse button " << event.mouse.button << " down at (" << event.mouse.x << ", " << event.mouse.y << ")";
                     activeScene->OnMouseDown(event.mouse.button, event.mouse.x, event.mouse.y);
                     break;
                 case ALLEGRO_EVENT_MOUSE_BUTTON_UP:

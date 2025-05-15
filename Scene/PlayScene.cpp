@@ -10,6 +10,7 @@
 
 #include "Enemy/Enemy.hpp"
 #include "Enemy/SoldierEnemy.hpp"
+#include "Enemy/PlaneEnemy.hpp"
 #include "Enemy/TankEnemy.hpp"
 #include "Engine/AudioHelper.hpp"
 #include "Engine/GameEngine.hpp"
@@ -23,6 +24,7 @@
 #include "UI/Animation/DirtyEffect.hpp"
 #include "UI/Animation/Plane.hpp"
 #include "UI/Component/Label.hpp"
+
 
 // TODO HACKATHON-4 (1/3): Trace how the game handles keyboard input.
 // TODO HACKATHON-4 (2/3): Find the cheat code sequence in this file.
@@ -40,7 +42,7 @@ const Engine::Point PlayScene::EndGridPoint = Engine::Point(MapWidth, MapHeight 
 const std::vector<int> PlayScene::code = {
     ALLEGRO_KEY_UP, ALLEGRO_KEY_UP, ALLEGRO_KEY_DOWN, ALLEGRO_KEY_DOWN,
     ALLEGRO_KEY_LEFT, ALLEGRO_KEY_RIGHT, ALLEGRO_KEY_LEFT, ALLEGRO_KEY_RIGHT,
-    ALLEGRO_KEY_B, ALLEGRO_KEY_A, ALLEGRO_KEYMOD_SHIFT, ALLEGRO_KEY_ENTER
+    ALLEGRO_KEY_B, ALLEGRO_KEY_A, ALLEGRO_KEY_RSHIFT, ALLEGRO_KEY_ENTER
 };
 Engine::Point PlayScene::GetClientSize() {
     return Engine::Point(MapWidth * BlockSize, MapHeight * BlockSize);
@@ -145,7 +147,7 @@ void PlayScene::Update(float deltaTime) {
                 delete UIGroup;
                 delete imgTarget;*/
                 // Win.
-                Engine::GameEngine::GetInstance().ChangeScene("win-scene");
+                Engine::GameEngine::GetInstance().ChangeScene("win");
             }
             continue;
         }
@@ -161,8 +163,9 @@ void PlayScene::Update(float deltaTime) {
                 EnemyGroup->AddNewObject(enemy = new SoldierEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
                 break;
             // TODO HACKATHON-3 (2/3): Add your new enemy here.
-            // case 2:
-            //     ...
+            case 2:
+                EnemyGroup->AddNewObject(enemy = new PlaneEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                break;
             case 3:
                 EnemyGroup->AddNewObject(enemy = new TankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
                 break;
@@ -262,6 +265,21 @@ void PlayScene::OnKeyDown(int keyCode) {
         keyStrokes.push_back(keyCode);
         if (keyStrokes.size() > code.size())
             keyStrokes.pop_front();
+        if ( keyStrokes.size() == code.size() ) {
+            // Engine::LOG(Engine::VERBOSE) << "validating:\n";
+            // for ( auto i : keyStrokes) {
+            //     Engine::LOG(Engine::VERBOSE) << i << ' ';
+            // }Engine::LOG(Engine::VERBOSE) << "\nnext\n";
+            // for (auto i : code) {
+            //     Engine::LOG(Engine::VERBOSE)<< i << ' ';
+            // } Engine::LOG(Engine::VERBOSE)<< "\n";
+            bool same = std::equal(keyStrokes.begin(), keyStrokes.end(), code.begin());
+            if ( same ) {
+                Engine::LOG(Engine::INFO) << "getting a plane\n";
+                EarnMoney(10000);
+                EffectGroup->AddNewObject( new Plane() );
+            }
+        }
     }
     if (keyCode == ALLEGRO_KEY_Q) {
         // Hotkey for MachineGunTurret.
@@ -277,6 +295,9 @@ void PlayScene::OnKeyDown(int keyCode) {
 }
 void PlayScene::Hit() {
     lives--;
+    // UIGroup->AddNewObject(UILives = new Engine::Label(std::string("Life ") + std::to_string(lives), "pirulen.ttf", 24, 1294, 88));
+    UILives->Text = std::string("Life ") + std::to_string(this->lives);
+    // UIMoney->Text = std::string("$") + std::to_string(this->money);
     if (lives <= 0) {
         Engine::GameEngine::GetInstance().ChangeScene("lose");
     }
