@@ -9,6 +9,7 @@
 #include "Scene/WinScene.hpp"
 #include "Scene/StartScene.h"
 #include "Scene/SettingsScene.hpp"
+#include "Scene/ScoreboardScene.hpp"
 
 int main(int argc, char **argv) {
 	// Engine::LOG::SetConfig(true); // no output verbose
@@ -23,9 +24,8 @@ int main(int argc, char **argv) {
 	game.AddNewScene("win", new WinScene());
 	game.AddNewScene("start", new StartScene());
 	game.AddNewScene("settings", new SettingsScene());
+	game.AddNewScene("scoreboard-scene", new ScoreboardScene());
 
-    // TODO HACKATHON-1 (1/1): Change the start scene
-	// game.Start("stage-select", 60, 1600, 832);
 	game.Start("start", 60, 1600, 832);
 	return 0;
 }

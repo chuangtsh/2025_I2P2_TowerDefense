@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <ctime>
 
 #include "Enemy/Enemy.hpp"
 #include "Enemy/SoldierEnemy.hpp"
@@ -24,6 +25,7 @@
 #include "UI/Animation/DirtyEffect.hpp"
 #include "UI/Animation/Plane.hpp"
 #include "UI/Component/Label.hpp"
+#include "ScoreboardScene.hpp"
 
 
 // TODO HACKATHON-4 (1/3): Trace how the game handles keyboard input.
@@ -47,6 +49,8 @@ const std::vector<int> PlayScene::code = {
 Engine::Point PlayScene::GetClientSize() {
     return Engine::Point(MapWidth * BlockSize, MapHeight * BlockSize);
 }
+
+
 void PlayScene::Initialize() {
     mapState.clear();
     keyStrokes.clear();
@@ -78,6 +82,7 @@ void PlayScene::Initialize() {
     Engine::Resources::GetInstance().GetBitmap("lose/benjamin-happy.png");
     // Start BGM.
     bgmId = AudioHelper::PlayBGM("play.ogg");
+
 }
 void PlayScene::Terminate() {
     AudioHelper::StopBGM(bgmId);
@@ -147,6 +152,15 @@ void PlayScene::Update(float deltaTime) {
                 delete UIGroup;
                 delete imgTarget;*/
                 // Win.
+
+                // add record here
+                std::time_t now = std::time(nullptr);
+                std::tm* localTime = std::localtime(&now);
+                int month = localTime->tm_mon + 1;
+                int date = localTime->tm_mday;
+                int hour = localTime->tm_hour;
+                int minute = localTime->tm_min;
+                ScoreboardScene::AddRecord(money, this->lives, month, date, hour ,minute);
                 Engine::GameEngine::GetInstance().ChangeScene("win");
             }
             continue;
