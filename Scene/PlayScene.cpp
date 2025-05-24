@@ -13,6 +13,7 @@
 #include "Enemy/SoldierEnemy.hpp"
 #include "Enemy/PlaneEnemy.hpp"
 #include "Enemy/TankEnemy.hpp"
+#include "Enemy/MultiTankEnemy.hpp"
 #include "Engine/AudioHelper.hpp"
 #include "Engine/GameEngine.hpp"
 #include "Engine/Group.hpp"
@@ -21,6 +22,7 @@
 #include "PlayScene.hpp"
 #include "Turret/LaserTurret.hpp"
 #include "Turret/MachineGunTurret.hpp"
+#include "Turret/FireTurret.hpp"
 #include "Turret/TurretButton.hpp"
 #include "UI/Animation/DirtyEffect.hpp"
 #include "UI/Animation/Plane.hpp"
@@ -49,6 +51,8 @@ const std::vector<int> PlayScene::code = {
 Engine::Point PlayScene::GetClientSize() {
     return Engine::Point(MapWidth * BlockSize, MapHeight * BlockSize);
 }
+
+int turret_id=0;
 
 
 void PlayScene::Initialize() {
@@ -183,6 +187,9 @@ void PlayScene::Update(float deltaTime) {
             case 3:
                 EnemyGroup->AddNewObject(enemy = new TankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
                 break;
+            case 4:
+                EnemyGroup->AddNewObject(enemy = new MultiTankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                break;
             default:
                 continue;
         }
@@ -233,6 +240,7 @@ void PlayScene::OnMouseMove(int mx, int my) {
     imgTarget->Position.y = y * BlockSize;
 }
 void PlayScene::OnMouseUp(int button, int mx, int my) {
+    Engine::LOG(Engine::DEBUGGING) << "turret_id=" << turret_id;
     IScene::OnMouseUp(button, mx, my);
     if (!imgTarget->Visible)
         return;
@@ -248,6 +256,15 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
                 GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
                 sprite->Rotation = 0;
                 return;
+            }
+            if ( turret_id == 2 ) {
+                if (!CheckSpaceValid(x, y+2)) {
+                Engine::LOG(Engine::DEBUGGING) << "invalid here";
+                    Engine::Sprite *sprite;
+                    GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
+                    sprite->Rotation = 0;
+                    return;
+                }
             }
             // Purchase.
             EarnMoney(-preview->GetPrice());
@@ -267,6 +284,9 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
             preview = nullptr;
 
             mapState[y][x] = TILE_OCCUPIED;
+            if ( turret_id == 2 ) {
+                mapState[y+2][x] = TILE_OCCUPIED;
+            }
             OnMouseMove(mx, my);
         }
     }
@@ -391,6 +411,14 @@ void PlayScene::ConstructUI() {
                            Engine::Sprite("play/turret-2.png", 1370, 136 - 8, 0, 0, 0, 0), 1370, 136, LaserTurret::Price);
     btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 1));
     UIGroup->AddNewControlObject(btn);
+    // Button 3
+    btn = new TurretButton("play/floor.png", "play/dirt.png",
+                           Engine::Sprite("play/tower-base.png", 1446, 136, 0, 0, 0, 0),
+                           Engine::Sprite("play/turret-6.png", 1446, 136 - 8, 0, 0, 0, 0), 1446, 136, FireTurret::Price);
+    
+    btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 2));
+    UIGroup->AddNewControlObject(btn);
+
 
     int w = Engine::GameEngine::GetInstance().GetScreenSize().x;
     int h = Engine::GameEngine::GetInstance().GetScreenSize().y;
@@ -401,12 +429,16 @@ void PlayScene::ConstructUI() {
 }
 
 void PlayScene::UIBtnClicked(int id) {
+    turret_id = id;
     if (preview)
         UIGroup->RemoveObject(preview->GetObjectIterator());
     if (id == 0 && money >= MachineGunTurret::Price)
         preview = new MachineGunTurret(0, 0);
-    else if (id == 1 && money >= LaserTurret::Price)
+    else if (id == 1 && money >= LaserTurret::Price) 
         preview = new LaserTurret(0, 0);
+    else if ( id == 2 && money >= FireTurret::Price) {
+        preview = new FireTurret(0,0);
+    }
     if (!preview)
         return;
     preview->Position = Engine::GameEngine::GetInstance().GetMousePosition();
@@ -473,4 +505,12 @@ std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
         //               mapState[y][x] is TILE_DIRT if it is empty.
     }
     return map;
+}
+
+// PlayScene& PlayScene::GetInstance() {
+//     static PlayScene instance;
+//     return instance;
+// }
+bool PlayScene::CheckTileFloor(int x, int y) {
+    return mapState[y][x] == TILE_FLOOR;
 }

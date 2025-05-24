@@ -18,6 +18,7 @@ PlayScene *Turret::getPlayScene() {
 Turret::Turret(std::string imgBase, std::string imgTurret, float x, float y, float radius, int price, float coolDown) : Sprite(imgTurret, x, y), price(price), coolDown(coolDown), imgBase(imgBase, x, y) {
     CollisionRadius = radius;
 }
+
 void Turret::Update(float deltaTime) {
     Sprite::Update(deltaTime);
     PlayScene *scene = getPlayScene();
@@ -77,7 +78,7 @@ void Turret::Draw() const {
         al_draw_filled_circle(Position.x, Position.y, CollisionRadius, al_map_rgba(0, 255, 0, 50));
     }
     imgBase.Draw();
-    Sprite::Draw();
+    Sprite::Draw(); // related to top?
     if (PlayScene::DebugMode) {
         // Draw target radius.
         al_draw_circle(Position.x, Position.y, CollisionRadius, al_map_rgb(0, 0, 255), 2);
