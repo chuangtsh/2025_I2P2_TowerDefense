@@ -72,7 +72,7 @@ void Plane::Update(float deltaTime) {
             for (auto &it : getPlayScene()->EnemyGroup->GetObjects()) {
                 Enemy *enemy = dynamic_cast<Enemy *>(it);
                 if (Engine::Collider::IsCircleOverlap(Position, CollisionRadius, enemy->Position, enemy->CollisionRadius))
-                    enemy->Hit(INFINITY);
+                    enemy->Hit(INFINITY, 0);
             }
             break;
         case 3:
