@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <typeinfo>
 
 #include "Enemy/Enemy.hpp"
 #include "Enemy/SoldierEnemy.hpp"
@@ -24,6 +25,7 @@
 #include "Turret/MachineGunTurret.hpp"
 #include "Turret/FireTurret.hpp"
 #include "Turret/TurretButton.hpp"
+#include "Turret/Shovel.hpp"
 #include "UI/Animation/DirtyEffect.hpp"
 #include "UI/Animation/Plane.hpp"
 #include "UI/Component/Label.hpp"
@@ -247,23 +249,64 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
     const int x = mx / BlockSize;
     const int y = my / BlockSize;
     if (button & 1) {
-        if (mapState[y][x] != TILE_OCCUPIED) {
+        if ( turret_id == 3 ) {
+            // Shovel
+            if ( CheckSpaceTurret(x, y) ) {
+                Engine::LOG(Engine::DEBUGGING) << "find turret at x, y";
+
+                if ( mapState[y][x] == TILE_FIRE_SIBLING ) {
+                    Engine::LOG(Engine::INFO) << "the fire sibling";
+                    RemoveTurretAt(x, y-2);
+                    mapState[y-2][x] = TILE_FLOOR;
+                    RemoveTurretAt(x, y);
+                    mapState[y][x] = TILE_FLOOR;
+                }
+                else {
+                    RemoveTurretAt(x, y); 
+                    mapState[y][x] = TILE_FLOOR;
+                    if ( mapState[y+2][x] = TILE_FIRE_SIBLING ) {
+                        RemoveTurretAt(x, y+2);
+                        mapState[y+2][x] = TILE_FLOOR;
+                    }
+                }
+                Engine::Sprite *sprite;
+                GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/turret-fire.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
+                sprite->Rotation = 0;
+                // Purchase.
+                EarnMoney(-preview->GetPrice());
+                preview->GetObjectIterator()->first = false;
+                UIGroup->RemoveObject(preview->GetObjectIterator());
+                // To keep responding when paused.
+                preview->Update(0);
+                // Remove Preview.
+                preview = nullptr;
+                std::vector<std::vector<int>> map = CalculateBFSDistance();
+                mapDistance = map;
+                for (auto &it : EnemyGroup->GetObjects())
+                    dynamic_cast<Enemy *>(it)->UpdatePath(mapDistance);
+                return;
+            }
+        }
+        else if (mapState[y][x] != TILE_OCCUPIED && mapState[y][x] != TILE_FIRE_SIBLING) {
             if (!preview)
                 return;
             // Check if valid.
-            if (!CheckSpaceValid(x, y)) {
-                Engine::Sprite *sprite;
-                GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
-                sprite->Rotation = 0;
-                return;
-            }
-            if ( turret_id == 2 ) {
-                if (!CheckSpaceValid(x, y+2)) {
-                Engine::LOG(Engine::DEBUGGING) << "invalid here";
+            else {
+                if (!CheckSpaceValid(x, y)) {
                     Engine::Sprite *sprite;
                     GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
                     sprite->Rotation = 0;
                     return;
+                }
+                if ( turret_id == 2 ) {
+                    // if (!CheckSpaceValid(x, y+2) || mapState[y][x] == TILE_OCCUPIED || mapState[y][x] == TILE_FIRE_SIBLING) {
+                    if (mapState[y+2][x] == TILE_OCCUPIED || mapState[y+2][x] == TILE_FIRE_SIBLING) {
+                        Engine::LOG(Engine::DEBUGGING) << "invalid here";
+                        Engine::Sprite *sprite;
+                        GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
+                        sprite->Rotation = 0;
+                        return;
+                    }
                 }
             }
             // Purchase.
@@ -285,7 +328,7 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
 
             mapState[y][x] = TILE_OCCUPIED;
             if ( turret_id == 2 ) {
-                mapState[y+2][x] = TILE_OCCUPIED;
+                mapState[y+2][x] = TILE_FIRE_SIBLING;
             }
             OnMouseMove(mx, my);
         }
@@ -379,7 +422,12 @@ void PlayScene::ReadMap() {
     }
 }
 void PlayScene::ReadEnemyWave() {
+    // change enemy here
+    // original
     std::string filename = std::string("Resource/enemy") + std::to_string(MapId) + ".txt";
+    // testing:
+    // std::string filename = std::string("Resource/enemy_test.txt");
+
     // Read enemy file.
     float type, wait, repeat;
     enemyWaveData.clear();
@@ -415,8 +463,13 @@ void PlayScene::ConstructUI() {
     btn = new TurretButton("play/floor.png", "play/dirt.png",
                            Engine::Sprite("play/tower-base.png", 1446, 136, 0, 0, 0, 0),
                            Engine::Sprite("play/turret-6.png", 1446, 136 - 8, 0, 0, 0, 0), 1446, 136, FireTurret::Price);
-    
     btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 2));
+    UIGroup->AddNewControlObject(btn);
+    // Tool
+    btn = new TurretButton("play/floor.png", "play/dirt.png",
+                           Engine::Sprite("play/tool-base.png", 1522, 136, 0, 0, 0, 0),
+                           Engine::Sprite("play/shovel.png", 1522, 136 - 8, 0, 0, 0, 0), 1522, 136, Shovel::Price);
+    btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 3));
     UIGroup->AddNewControlObject(btn);
 
 
@@ -438,6 +491,9 @@ void PlayScene::UIBtnClicked(int id) {
         preview = new LaserTurret(0, 0);
     else if ( id == 2 && money >= FireTurret::Price) {
         preview = new FireTurret(0,0);
+    }
+    else if ( id == 3 && money >= Shovel::Price ) {
+        preview = new Shovel(0,0);
     }
     if (!preview)
         return;
@@ -470,11 +526,21 @@ bool PlayScene::CheckSpaceValid(int x, int y) {
             return false;
     }
     // All enemy have path to exit.
-    mapState[y][x] = TILE_OCCUPIED;
+    // mapState[y][x] = TILE_OCCUPIED;
     mapDistance = map;
     for (auto &it : EnemyGroup->GetObjects())
         dynamic_cast<Enemy *>(it)->UpdatePath(mapDistance);
     return true;
+}
+bool PlayScene::CheckSpaceTurret(int x, int y ) {
+    if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
+        return false;
+    if ( mapState[y][x] != TILE_OCCUPIED && mapState[y][x] != TILE_FIRE_SIBLING ) {
+        return false;
+    }
+    // // All enemy have path to exit.
+    return true;
+
 }
 std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
     // Reverse BFS to find path.
@@ -513,4 +579,65 @@ std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
 // }
 bool PlayScene::CheckTileFloor(int x, int y) {
     return mapState[y][x] == TILE_FLOOR;
+}
+
+// not sure about the remove logic
+int PlayScene::RemoveTurretAt(int x, int y) {
+    Engine::LOG(Engine::DEBUGGING) << "=== TowerGroup contents ===";
+    int idx = 0;
+    int tp = 0;
+    for (auto obj : TowerGroup->GetObjects()) {
+        Turret* turret = dynamic_cast<Turret*>(obj);
+        if (turret) {
+            Engine::LOG(Engine::DEBUGGING)
+                << "[" << idx << "] "
+                << "Type: " << typeid(*turret).name()
+                << ", Pos: (" << turret->Position.x << ", " << turret->Position.y << ")"
+                << ", Ptr: " << turret;
+        } else {
+            Engine::LOG(Engine::DEBUGGING)
+                << "[" << idx << "] "
+                << "Non-turret object, Ptr: " << obj;
+        }
+        ++idx;
+    }
+    Engine::LOG(Engine::DEBUGGING) << "=== End of TowerGroup ===";
+    // Calculate the center position of the tile
+    float px = x * BlockSize + BlockSize / 2;
+    float py = y * BlockSize + BlockSize / 2;
+
+
+    // Find the turret at this position
+    // for (auto it = TowerGroup->GetObjects().rbegin(); it != TowerGroup->GetObjects().rend(); --it) {
+    for ( auto it : TowerGroup->GetObjects() ) {
+        Turret* turret = dynamic_cast<Turret*>(it);
+        if (turret && std::abs(turret->Position.x - px) < 1e-3 && std::abs(turret->Position.y - py) < 1e-3 ) {
+            Engine::LOG(Engine::DEBUGGING) << "inside delete";
+            tp = turret->GetType();
+            TowerGroup->RemoveObject(turret->GetObjectIterator());
+            mapState[y][x] = TILE_FLOOR; // Mark the tile as empty
+            break;
+        }
+        Engine::LOG(Engine::DEBUGGING) << "finish delete";
+    }
+    Engine::LOG(Engine::DEBUGGING) << "finish remove";
+    Engine::LOG(Engine::DEBUGGING) << "=== TowerGroup contents ===";
+    idx = 0;
+    for (auto obj : TowerGroup->GetObjects()) {
+        Turret* turret = dynamic_cast<Turret*>(obj);
+        if (turret) {
+            Engine::LOG(Engine::DEBUGGING)
+                << "[" << idx << "] "
+                << "Type: " << typeid(*turret).name()
+                << ", Pos: (" << turret->Position.x << ", " << turret->Position.y << ")"
+                << ", Ptr: " << turret;
+        } else {
+            Engine::LOG(Engine::DEBUGGING)
+                << "[" << idx << "] "
+                << "Non-turret object, Ptr: " << obj;
+        }
+        ++idx;
+    }
+    Engine::LOG(Engine::DEBUGGING) << "=== End of TowerGroup ===";
+    return tp;
 }

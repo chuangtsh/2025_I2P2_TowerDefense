@@ -9,12 +9,19 @@
 class Enemy;
 class PlayScene;
 
+enum turret_type {
+    MACHINEGUN,
+    LASER,
+    FIRE,
+};
+
 class Turret : public Engine::Sprite {
 protected:
     int price;
     float coolDown;
     float reload = 0;
     float rotateRadian = 2 * ALLEGRO_PI;
+    int type;
     Sprite imgBase;
     std::list<Turret *>::iterator lockedTurretIterator;
     PlayScene *getPlayScene();
@@ -29,5 +36,6 @@ public:
     void Update(float deltaTime) override;
     void Draw() const override;
     int GetPrice() const;
+    int GetType() const;
 };
 #endif   // TURRET_HPP

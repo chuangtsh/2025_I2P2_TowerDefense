@@ -17,6 +17,7 @@ const int FireTurret::Price = 10;
 FireTurret::FireTurret(float x, float y) : Turret("play/tower-base.png", "play/turret-5.png", x, y, 100, Price, 0.1) {
     // Move center downward, since we the turret head is slightly biased upward.
     Anchor.y += 8.0f / GetBitmapHeight();
+    Turret::type = FIRE;
     int tileSize = PlayScene::BlockSize;
     sibling_base = new Engine::Sprite("play/tower-base.png", x, y+2*tileSize);
     sibling_head = new Engine::Sprite("play/turret-5.png", x, y+2*tileSize);

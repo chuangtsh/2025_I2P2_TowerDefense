@@ -86,6 +86,8 @@ add_executable(2025_I2P2_TowerDefense
     Turret/TurretButton.hpp
     Turret/FireTurret.cpp
     Turret/FireTurret.hpp
+    Turret/Shovel.cpp
+    Turret/Shovel.hpp
 
     UI/Animation/DirtyEffect.cpp
     UI/Animation/DirtyEffect.hpp
@@ -102,6 +104,7 @@ add_executable(2025_I2P2_TowerDefense
     UI/Component/Label.hpp
     UI/Component/Slider.cpp
     UI/Component/Slider.hpp
+
     
     main.cpp
 )

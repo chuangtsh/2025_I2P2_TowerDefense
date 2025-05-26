@@ -189,7 +189,7 @@ void ScoreboardScene::PrevPageOnClick() {
 
 
 void ScoreboardScene::AddRecord(int money, int life, int month, int date, int hour, int minute) {
-    int score = money*2/3 - life*10;
+    int score = money*2/3 - (10-life)*10;
     date_time *ntd = new date_time;
     ntd->date = date;
     ntd->hour = hour;

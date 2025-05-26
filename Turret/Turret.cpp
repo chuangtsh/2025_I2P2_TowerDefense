@@ -19,6 +19,9 @@ Turret::Turret(std::string imgBase, std::string imgTurret, float x, float y, flo
     CollisionRadius = radius;
 }
 
+int Turret::GetType() const {
+    return this->type;
+}
 void Turret::Update(float deltaTime) {
     Sprite::Update(deltaTime);
     PlayScene *scene = getPlayScene();
