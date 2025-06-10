@@ -254,7 +254,7 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
             if ( CheckSpaceTurret(x, y) ) {
                 Engine::LOG(Engine::DEBUGGING) << "find turret at x, y";
 
-                if ( mapState[y][x] == TILE_FIRE_SIBLING ) {
+                if ( mapState[y][x] == TILE_TURRET_SIBLING ) {
                     Engine::LOG(Engine::INFO) << "the fire sibling";
                     RemoveTurretAt(x, y-2);
                     mapState[y-2][x] = TILE_FLOOR;
@@ -264,7 +264,7 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
                 else {
                     RemoveTurretAt(x, y); 
                     mapState[y][x] = TILE_FLOOR;
-                    if ( mapState[y+2][x] = TILE_FIRE_SIBLING ) {
+                    if ( mapState[y+2][x] = TILE_TURRET_SIBLING ) {
                         RemoveTurretAt(x, y+2);
                         mapState[y+2][x] = TILE_FLOOR;
                     }
@@ -287,7 +287,7 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
                 return;
             }
         }
-        else if (mapState[y][x] != TILE_OCCUPIED && mapState[y][x] != TILE_FIRE_SIBLING) {
+        else if (mapState[y][x] != TILE_TURRET && mapState[y][x] != TILE_TURRET_SIBLING) {
             if (!preview)
                 return;
             // Check if valid.
@@ -300,7 +300,7 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
                 }
                 if ( turret_id == 2 ) {
                     // if (!CheckSpaceValid(x, y+2) || mapState[y][x] == TILE_OCCUPIED || mapState[y][x] == TILE_FIRE_SIBLING) {
-                    if (mapState[y+2][x] == TILE_OCCUPIED || mapState[y+2][x] == TILE_FIRE_SIBLING) {
+                    if (mapState[y+2][x] == TILE_TURRET || mapState[y+2][x] == TILE_TURRET_SIBLING ) {
                         Engine::LOG(Engine::DEBUGGING) << "invalid here";
                         Engine::Sprite *sprite;
                         GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
@@ -326,9 +326,9 @@ void PlayScene::OnMouseUp(int button, int mx, int my) {
             // Remove Preview.
             preview = nullptr;
 
-            mapState[y][x] = TILE_OCCUPIED;
+            mapState[y][x] = TILE_TURRET;
             if ( turret_id == 2 ) {
-                mapState[y+2][x] = TILE_FIRE_SIBLING;
+                mapState[y+2][x] = TILE_TURRET_SIBLING;
             }
             OnMouseMove(mx, my);
         }
@@ -387,7 +387,9 @@ void PlayScene::EarnMoney(int money) {
     UIMoney->Text = std::string("$") + std::to_string(this->money);
 }
 void PlayScene::ReadMap() {
-    std::string filename = std::string("Resource/map") + std::to_string(MapId) + ".txt";
+    // now plants v.s. zombies, so ID = 3
+    MapId = 3;
+    std::string filename = std::string("Resource/map") + std::to_string(2) + ".txt";
     // Read map file.
     char c;
     std::vector<bool> mapData;
@@ -413,20 +415,20 @@ void PlayScene::ReadMap() {
     for (int i = 0; i < MapHeight; i++) {
         for (int j = 0; j < MapWidth; j++) {
             const int num = mapData[i * MapWidth + j];
-            mapState[i][j] = num ? TILE_FLOOR : TILE_DIRT;
+            mapState[i][j] = num ? TILE_FLOOR : TILE_BASE;
             if (num)
                 TileMapGroup->AddNewObject(new Engine::Image("play/floor.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
             else
-                TileMapGroup->AddNewObject(new Engine::Image("play/dirt.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
+                TileMapGroup->AddNewObject(new Engine::Image("play/tower-base.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
         }
     }
 }
 void PlayScene::ReadEnemyWave() {
     // change enemy here
     // original
-    // std::string filename = std::string("Resource/enemy") + std::to_string(MapId) + ".txt";
+    std::string filename = std::string("Resource/enemy") + std::to_string(MapId) + ".txt";
     // testing:
-    std::string filename = std::string("Resource/enemy_test.txt");
+    // std::string filename = std::string("Resource/enemy_test.txt");
 
     // Read enemy file.
     float type, wait, repeat;
@@ -509,7 +511,7 @@ bool PlayScene::CheckSpaceValid(int x, int y) {
     if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
         return false;
     auto map00 = mapState[y][x];
-    mapState[y][x] = TILE_OCCUPIED;
+    mapState[y][x] = TILE_TURRET;
     std::vector<std::vector<int>> map = CalculateBFSDistance();
     mapState[y][x] = map00;
     if (map[0][0] == -1)
@@ -526,7 +528,7 @@ bool PlayScene::CheckSpaceValid(int x, int y) {
             return false;
     }
     // All enemy have path to exit.
-    // mapState[y][x] = TILE_OCCUPIED;
+    mapState[y][x] = TILE_TURRET;
     mapDistance = map;
     for (auto &it : EnemyGroup->GetObjects())
         dynamic_cast<Enemy *>(it)->UpdatePath(mapDistance);
@@ -535,43 +537,68 @@ bool PlayScene::CheckSpaceValid(int x, int y) {
 bool PlayScene::CheckSpaceTurret(int x, int y ) {
     if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
         return false;
-    if ( mapState[y][x] != TILE_OCCUPIED && mapState[y][x] != TILE_FIRE_SIBLING ) {
+    if ( mapState[y][x] != TILE_TURRET && mapState[y][x] != TILE_TURRET_SIBLING ) {
         return false;
     }
     // // All enemy have path to exit.
     return true;
 
 }
+// 6/10 morning start from here
 std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
-    // Reverse BFS to find path.
-    std::vector<std::vector<int>> map(MapHeight, std::vector<int>(std::vector<int>(MapWidth, -1)));
-    std::queue<Engine::Point> que;
-    // Push end point.
-    // BFS from end point.
-    if (mapState[MapHeight - 1][MapWidth - 1] != TILE_DIRT)
-        return map;
-    que.push(Engine::Point(MapWidth - 1, MapHeight - 1));
-    map[MapHeight - 1][MapWidth - 1] = 0;
-    while (!que.empty()) {
-        Engine::Point p = que.front();
-        que.pop();
-        for (auto dir : directions) {
-            int nx = p.x + dir.x;
-            int ny = p.y + dir.y;
-
-            // Check bounds and if the tile is empty and not visited.
-            if (nx >= 0 && nx < MapWidth && ny >= 0 && ny < MapHeight &&
-                mapState[ny][nx] == TILE_DIRT && map[ny][nx] == -1) {
-                map[ny][nx] = map[p.y][p.x] + 1; // Update distance.
-                que.push(Engine::Point(nx, ny)); // Add to queue.
+    // Plants vs. Zombies logic: distance = steps to rightmost TILE_DIRT in the same row.
+    std::vector<std::vector<int>> map(MapHeight, std::vector<int>(MapWidth, -1));
+    for (int y = 0; y < MapHeight; ++y) {
+        // Find the rightmost TILE_DIRT in this row
+        int rightmost = -1;
+        for (int x = MapWidth - 1; x >= 0; --x) {
+            if (mapState[y][x] == TILE_BASE) {
+                rightmost = x;
+                break;
             }
         }
-        // TODO PROJECT-1 (1/1): Implement a BFS starting from the most right-bottom block in the map.
-        //               For each step you should assign the corresponding distance to the most right-bottom block.
-        //               mapState[y][x] is TILE_DIRT if it is empty.
+        if (rightmost == -1) continue; // No path in this row
+        // Assign distance for each TILE_DIRT in this row
+        for (int x = 0; x <= rightmost; ++x) {
+            if (mapState[y][x] == TILE_FLOOR ) {
+                map[y][x] = rightmost - x;
+            }
+        }
+        // Optionally, set rightmost tile to 0 (goal)
+        // map[y][rightmost] = 0;
     }
     return map;
 }
+// std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
+//     // Reverse BFS to find path.
+//     std::vector<std::vector<int>> map(MapHeight, std::vector<int>(std::vector<int>(MapWidth, -1)));
+//     std::queue<Engine::Point> que;
+//     // Push end point.
+//     // BFS from end point.
+//     if (mapState[MapHeight - 1][MapWidth - 1] != TILE_DIRT)
+//         return map;
+//     que.push(Engine::Point(MapWidth - 1, MapHeight - 1));
+//     map[MapHeight - 1][MapWidth - 1] = 0;
+//     while (!que.empty()) {
+//         Engine::Point p = que.front();
+//         que.pop();
+//         for (auto dir : directions) {
+//             int nx = p.x + dir.x;
+//             int ny = p.y + dir.y;
+
+//             // Check bounds and if the tile is empty and not visited.
+//             if (nx >= 0 && nx < MapWidth && ny >= 0 && ny < MapHeight &&
+//                 mapState[ny][nx] == TILE_DIRT && map[ny][nx] == -1) {
+//                 map[ny][nx] = map[p.y][p.x] + 1; // Update distance.
+//                 que.push(Engine::Point(nx, ny)); // Add to queue.
+//             }
+//         }
+//         // TODO PROJECT-1 (1/1): Implement a BFS starting from the most right-bottom block in the map.
+//         //               For each step you should assign the corresponding distance to the most right-bottom block.
+//         //               mapState[y][x] is TILE_DIRT if it is empty.
+//     }
+//     return map;
+// }
 
 // PlayScene& PlayScene::GetInstance() {
 //     static PlayScene instance;
