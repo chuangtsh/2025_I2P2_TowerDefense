@@ -2,6 +2,7 @@
 #include <allegro5/color.h>
 #include <cmath>
 #include <random>
+#include <csignal>
 #include <string>
 #include <vector>
 
@@ -73,6 +74,12 @@ void Enemy::UpdatePath(const std::vector<std::vector<int>> &mapDistance) {
                 continue;
             nextHops.emplace_back(x, y);
         }
+        // ADD THIS CHECK:
+        if (nextHops.empty()) {
+            // No valid next hop found - prevent segfault
+            Engine::LOG(Engine::DEBUGGING) << "Enemy path finding failed - no valid next hop";
+            return;
+        }
         // Choose arbitrary one.
         std::random_device dev;
         std::mt19937 rng(dev());
@@ -87,7 +94,7 @@ void Enemy::Update(float deltaTime) {
     // Pre-calculate the velocity.
     float remainSpeed = speed * deltaTime;
     while (remainSpeed != 0) {
-        if (path.empty()) {
+        if (path.empty() || Position.x / PlayScene::BlockSize >= PlayScene::MapWidth-1) {
             // Reach end point.
             Hit(hp, 1);
             getPlayScene()->Hit();
@@ -114,7 +121,78 @@ void Enemy::Update(float deltaTime) {
     }
     Rotation = atan2(Velocity.y, Velocity.x);
     Sprite::Update(deltaTime);
+
+    // CheckTurretCollision();
 }
+
+// void SignalHandler(int signal) {
+//     if (signal == SIGSEGV) {
+//         std::cerr << "Segmentation fault caught! Exiting gracefully." << std::endl;
+//         std::exit(signal); // Exit the program
+//     }
+// }
+void Enemy::CheckTurretCollision() {
+    PlayScene* scene = getPlayScene();
+    if (!scene) return;
+    
+    // Get my position on the grid
+    int gridX = static_cast<int>(Position.x / PlayScene::BlockSize);
+    int gridY = static_cast<int>(Position.y / PlayScene::BlockSize);
+    Engine::LOG(Engine::DEBUGGING) << "here1";
+    
+    Engine::LOG(Engine::DEBUGGING) << "cnt:" << scene->TowerGroup->GetObjects().size();
+    for (auto it = scene->TowerGroup->GetObjects().begin(); it != scene->TowerGroup->GetObjects().end();it++ ) {
+        Engine::LOG(Engine::DEBUGGING) << "here0";
+        Turret* turret = dynamic_cast<Turret*>(*it);
+
+        Engine::LOG(Engine::DEBUGGING) << "here1";
+        if (turret == nullptr) {
+            // ++it;
+            // continue;
+            continue;
+        }
+        Engine::LOG(Engine::DEBUGGING) << "here2";
+        // Get turret position on grid
+        int turretX = static_cast<int>(turret->Position.x / PlayScene::BlockSize);
+        int turretY = static_cast<int>(turret->Position.y / PlayScene::BlockSize);
+         Engine::LOG(Engine::DEBUGGING) << "here3";
+        
+        // Check if on the same tile
+        if (gridX == turretX && gridY == turretY) {
+            // scene->RemoveTurretAt(turret->Position.x, turret->Position.y);
+            // Engine::LOG(Engine::DEBUGGING) << "here insde check collision loop";
+            // // Create explosion effect
+            // scene->EffectGroup->AddNewObject(
+            //     new ExplosionEffect(turret->Position.x, turret->Position.y));
+            // AudioHelper::PlayAudio("explosion.wav");
+            
+            // // Reset tile state
+            scene->mapState[turretY][turretX] = PlayScene::TileType::TILE_FLOOR;
+            
+            // // Special case for fire turret
+            // if (turretY + 2 < PlayScene::MapHeight && 
+            //     scene->mapState[turretY+2][turretX] == PlayScene::TileType::TILE_TURRET_SIBLING) {
+            //     scene->mapState[turretY+2][turretX] = PlayScene::TileType::TILE_FLOOR;
+            // }
+            // if (turretY >= 2 && 
+            //     scene->mapState[turretY-2][turretX] == PlayScene::TileType::TILE_TURRET_SIBLING) {
+            //     scene->mapState[turretY-2][turretX] = PlayScene::TileType::TILE_FLOOR; 
+            // }
+            
+            // // Remove turret and update iterator
+            turret->GetObjectIterator()->first = true;
+            scene->TowerGroup->RemoveObject(turret->GetObjectIterator());
+            return;
+        }
+         Engine::LOG(Engine::DEBUGGING) << "here4";
+        if ( it == scene->TowerGroup->GetObjects().end() ) {
+            return;
+        }
+         Engine::LOG(Engine::DEBUGGING) << "here6";
+    }
+    Engine::LOG(Engine::DEBUGGING) << "exist?";
+}
+
 void Enemy::Draw() const {
     Sprite::Draw();
     if (PlayScene::DebugMode) {

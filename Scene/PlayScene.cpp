@@ -38,7 +38,7 @@
 // TODO HACKATHON-5 (1/4): There's a bug in this file, which crashes the game when you win. Try to find it.
 // TODO HACKATHON-5 (2/4): The "LIFE" label are not updated when you lose a life. Try to fix it.
 
-bool PlayScene::DebugMode = false;
+bool PlayScene::DebugMode = true;
 const std::vector<Engine::Point> PlayScene::directions = { Engine::Point(-1, 0), Engine::Point(0, -1), Engine::Point(1, 0), Engine::Point(0, 1) };
 const int PlayScene::MapWidth = 20, PlayScene::MapHeight = 13;
 const int PlayScene::BlockSize = 64;
@@ -103,6 +103,10 @@ void PlayScene::Update(float deltaTime) {
         deathCountDown = -1;
     else if (deathCountDown != -1)
         SpeedMult = 1;
+
+    ReadEnemyWave();
+
+
     // Calculate danger zone.
     std::vector<float> reachEndTimes;
     for (auto &it : EnemyGroup->GetObjects()) {
@@ -172,25 +176,27 @@ void PlayScene::Update(float deltaTime) {
             continue;
         }
         auto current = enemyWaveData.front();
+        int current_col = enemyWaveColumn.front();
         if (ticks < current.second)
             continue;
         ticks -= current.second;
         enemyWaveData.pop_front();
+        enemyWaveColumn.pop_front();
         const Engine::Point SpawnCoordinate = Engine::Point(SpawnGridPoint.x * BlockSize + BlockSize / 2, SpawnGridPoint.y * BlockSize + BlockSize / 2);
         Enemy *enemy;
         switch (current.first) {
             case 1:
-                EnemyGroup->AddNewObject(enemy = new SoldierEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                EnemyGroup->AddNewObject(enemy = new SoldierEnemy(SpawnCoordinate.x, SpawnCoordinate.y + current_col * BlockSize ));
                 break;
             // TODO HACKATHON-3 (2/3): Add your new enemy here.
             case 2:
-                EnemyGroup->AddNewObject(enemy = new PlaneEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                EnemyGroup->AddNewObject(enemy = new PlaneEnemy(SpawnCoordinate.x, SpawnCoordinate.y + current_col * BlockSize));
                 break;
             case 3:
-                EnemyGroup->AddNewObject(enemy = new TankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                EnemyGroup->AddNewObject(enemy = new TankEnemy(SpawnCoordinate.x, SpawnCoordinate.y + current_col * BlockSize));
                 break;
             case 4:
-                EnemyGroup->AddNewObject(enemy = new MultiTankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+                EnemyGroup->AddNewObject(enemy = new MultiTankEnemy(SpawnCoordinate.x, SpawnCoordinate.y + current_col * BlockSize));
                 break;
             default:
                 continue;
@@ -395,9 +401,10 @@ void PlayScene::ReadMap() {
     std::vector<bool> mapData;
     std::ifstream fin(filename);
     while (fin >> c) {
+        Engine::LOG(Engine::DEBUGGING) << "c:" << c;
         switch (c) {
-            case '0': mapData.push_back(false); break;
-            case '1': mapData.push_back(true); break;
+            case '0': mapData.push_back(false); Engine::LOG(Engine::INFO)<<"map0"; break;
+            case '1': mapData.push_back(true); Engine::LOG(Engine::INFO)<<"map1";break;
             case '\n':
             case '\r':
                 if (static_cast<int>(mapData.size()) / MapWidth != 0)
@@ -415,31 +422,232 @@ void PlayScene::ReadMap() {
     for (int i = 0; i < MapHeight; i++) {
         for (int j = 0; j < MapWidth; j++) {
             const int num = mapData[i * MapWidth + j];
-            mapState[i][j] = num ? TILE_FLOOR : TILE_BASE;
+            mapState[i][j] = num ? TILE_BASE : TILE_FLOOR;
             if (num)
-                TileMapGroup->AddNewObject(new Engine::Image("play/floor.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
-            else
                 TileMapGroup->AddNewObject(new Engine::Image("play/tower-base.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
+            else
+                TileMapGroup->AddNewObject(new Engine::Image("play/floor.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
         }
     }
 }
 void PlayScene::ReadEnemyWave() {
-    // change enemy here
-    // original
-    std::string filename = std::string("Resource/enemy") + std::to_string(MapId) + ".txt";
-    // testing:
-    // std::string filename = std::string("Resource/enemy_test.txt");
-
-    // Read enemy file.
-    float type, wait, repeat;
-    enemyWaveData.clear();
-    std::ifstream fin(filename);
-    while (fin >> type && fin >> wait && fin >> repeat) {
-        for (int i = 0; i < repeat; i++)
-            enemyWaveData.emplace_back(type, wait);
+    if (enemyWaveData.size() >= 5) {
+        // Skip spawning new enemies if we already have enough in queue
+        Engine::LOG(Engine::INFO) << "Enemy queue already has " << enemyWaveData.size() 
+                                << " enemies. Skipping new generation.";
+        return;
     }
-    fin.close();
+    // Get current game state
+    int playerMoney = money;
+    int playerLives = lives;
+    int currentEnemyCount = EnemyGroup->GetObjects().size();
+    
+    // Count total turrets and types
+    int totalTurrets = 0;
+    int machineGunTurrets = 0;
+    int laserTurrets = 0;
+    int fireTurrets = 0;
+    
+    // Count turrets per row
+    std::vector<int> turretsInRow(MapHeight, 0);
+    std::vector<int> mgInRow(MapHeight, 0);
+    std::vector<int> laserInRow(MapHeight, 0);
+    std::vector<int> fireInRow(MapHeight, 0);
+    
+    for (auto obj : TowerGroup->GetObjects()) {
+        Turret* turret = dynamic_cast<Turret*>(obj);
+        if (turret) {
+            totalTurrets++;
+            // Get turret's row position
+            int row = static_cast<int>(turret->Position.y) / BlockSize;
+            if (row >= 0 && row < MapHeight) {
+                turretsInRow[row]++;
+                
+                switch (turret->GetType()) {
+                    case MACHINEGUN: 
+                        machineGunTurrets++; 
+                        mgInRow[row]++;
+                        break;
+                    case LASER: 
+                        laserTurrets++; 
+                        laserInRow[row]++;
+                        break;
+                    case FIRE: 
+                        fireTurrets++; 
+                        fireInRow[row]++;
+                        break;
+                }
+            }
+        }
+    }
+    
+    // Calculate difficulty based on game state (0-100 scale)
+    float difficulty = 0;
+    // More turrets = higher difficulty
+    difficulty += std::min(40, totalTurrets * 5);
+    // More money = higher difficulty
+    difficulty += std::min(20, playerMoney / 20);
+    // More lives = higher difficulty
+    difficulty += std::min(20, playerLives * 2);
+    // Add time-based difficulty progression
+    static int waveNumber = 0;
+    waveNumber++;
+    difficulty += std::min(20, waveNumber);
+    
+    // Maximum enemies on field based on difficulty
+    int maxEnemiesOnField = 10 + static_cast<int>(difficulty / 10);  // 10-20 enemies max
+    
+    // Adjust spawn count based on current enemy count
+    int enemySpaceLeft = maxEnemiesOnField - currentEnemyCount;
+    int enemiesToGenerate = std::min(5, std::max(0, enemySpaceLeft));
+    
+    // If map is already crowded, don't spawn more enemies
+    if (enemiesToGenerate <= 0) {
+        Engine::LOG(Engine::INFO) << "Max enemies reached (" << currentEnemyCount 
+                                 << "/" << maxEnemiesOnField << "). Skipping new spawns.";
+        return;
+    }
+    
+    float baseWaitTime = std::max(0.5f, 1.8f - (difficulty / 150.0f)); // 0.5-1.8 seconds
+    
+    // Log the AI decision process
+    Engine::LOG(Engine::INFO) << "Wave " << waveNumber << " - Generating " << enemiesToGenerate 
+                             << " enemies (current: " << currentEnemyCount << "/" << maxEnemiesOnField 
+                             << "), difficulty: " << difficulty;
+    
+    // Find weakest and strongest rows
+    int weakestRow = 0;
+    int strongestRow = 0;
+    
+    for (int i = 1; i < MapHeight; i++) {
+        if (turretsInRow[i] < turretsInRow[weakestRow])
+            weakestRow = i;
+        if (turretsInRow[i] > turretsInRow[strongestRow])
+            strongestRow = i;
+    }
+    
+    // Generate a few enemies based on current state
+    for (int i = 0; i < enemiesToGenerate; ++i) {
+        int enemyType;
+        float waitTime;
+        int targetRow;
+        
+        // Choose target row based on strategy
+        int rowStrategy = rand() % 100;
+        
+        // 60% chance to target weakest row, 20% chance to target strongest row (challenge), 20% chance for random
+        if (rowStrategy < 60) {
+            targetRow = weakestRow; // Target path of least resistance
+        } else if (rowStrategy < 80) {
+            targetRow = strongestRow; // Challenge the strongest defense
+        } else {
+            targetRow = rand() % MapHeight; // Random row
+        }
+        
+        // Early game (waves 1-5)
+        if (waveNumber <= 5) {
+            // Start with simple enemies
+            enemyType = (rand() % 100 < 80) ? 1 : 2; // 80% soldiers, 20% planes
+            waitTime = baseWaitTime * 1.2f;
+        }
+        // Mid game (waves 6-15)
+        else if (waveNumber <= 15) {
+            // Counter the specific row's defenses
+            if (mgInRow[targetRow] > laserInRow[targetRow] && mgInRow[targetRow] > fireInRow[targetRow]) {
+                // Many machine guns in this row, send tanks
+                enemyType = (rand() % 100 < 60) ? 3 : ((rand() % 100 < 50) ? 2 : 1);
+            } 
+            else if (laserInRow[targetRow] > mgInRow[targetRow] && laserInRow[targetRow] > fireInRow[targetRow]) {
+                // Many lasers in this row, send planes
+                enemyType = (rand() % 100 < 60) ? 2 : ((rand() % 100 < 50) ? 1 : 3);
+            } 
+            else {
+                // Many fire turrets or mixed in this row, send mixed enemies
+                enemyType = 1 + (rand() % 3);
+            }
+            waitTime = baseWaitTime * 0.9f;
+        }
+        // Late game (wave 16+)
+        else {
+            // Increase challenge progressively
+            int randVal = rand() % 100;
+            if (randVal < 30) {
+                enemyType = 1; // 30% soldiers
+            } else if (randVal < 55) {
+                enemyType = 2; // 25% planes  
+            } else if (randVal < 85) {
+                enemyType = 3; // 30% tanks
+            } else {
+                enemyType = 4; // 15% multi-tanks
+            }
+            waitTime = baseWaitTime * 0.7f;
+        }
+        
+        // Special cases based on player state
+        if (rand() % 100 < 20) {
+            if (playerLives <= 3) {
+                // Player is low on lives, send easier enemies
+                enemyType = (enemyType == 4) ? 3 : ((enemyType == 3) ? 1 : enemyType);
+                waitTime *= 1.2f;
+            } else if (playerMoney >= 300 && rand() % 100 < 30) {
+                // Player is rich, occasionally send expensive enemies
+                enemyType = (rand() % 100 < 40) ? 4 : 3;
+            }
+        }
+        
+        // If the target row is densely defended, consider stronger enemies
+        if (turretsInRow[targetRow] >= 3 && enemyType < 3) {
+            // Upgrade to a stronger enemy for heavily defended rows
+            enemyType += 1;
+        }
+        
+        // If there are many enemies already, increase wait time
+        float crowdFactor = static_cast<float>(currentEnemyCount) / maxEnemiesOnField;
+        waitTime *= (1.0f + crowdFactor);
+        
+        // Add randomness to wait times
+        waitTime *= 0.9f + (static_cast<float>(rand() % 40) / 100.0f);
+        
+        // Add to wave data
+        enemyWaveData.emplace_back(enemyType, waitTime);
+        enemyWaveColumn.push_back(targetRow); // Store which row this enemy should spawn in
+        
+        Engine::LOG(Engine::INFO) << "Adding enemy type " << enemyType 
+                                 << " targeting row " << targetRow 
+                                 << " (turrets in row: " << turretsInRow[targetRow] << ")";
+    }
+    
+    // Occasionally add a mini-boss if player is doing very well
+    // But only if there's room for more enemies
+    if (waveNumber % 5 == 0 && difficulty > 60 && playerLives > 5 && 
+        currentEnemyCount < maxEnemiesOnField - 1) {
+        
+        // Find the row with the most turrets for an extra challenge
+        enemyWaveData.emplace_back(4, baseWaitTime * 0.4f);
+        enemyWaveColumn.push_back(strongestRow); // Target the strongest row with the boss
+        
+        Engine::LOG(Engine::INFO) << "Adding mini-boss: Multi-tank to strongest row " << strongestRow;
+    }
+    
+    Engine::LOG(Engine::INFO) << "Generated " << enemyWaveData.size() << " enemies (total)";
 }
+// void PlayScene::ReadEnemyWave() {
+//     // // change enemy here
+//     // // original
+//     // std::string filename = std::string("Resource/enemy") + std::to_string(1) + ".txt";
+//     // // testing:
+//     std::string filename = std::string("Resource/enemy_test.txt");
+
+//     // Read enemy file.
+//     float type, wait, repeat;
+//     enemyWaveData.clear();
+//     std::ifstream fin(filename);
+//     while (fin >> type && fin >> wait && fin >> repeat) {
+//         for (int i = 0; i < repeat; i++)
+//             enemyWaveData.emplace_back(type, wait);
+//     }
+//     fin.close();
+// }
 void PlayScene::ConstructUI() {
     // Background
     UIGroup->AddNewObject(new Engine::Image("play/sand.png", 1280, 0, 320, 832));
@@ -552,7 +760,7 @@ std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
         // Find the rightmost TILE_DIRT in this row
         int rightmost = -1;
         for (int x = MapWidth - 1; x >= 0; --x) {
-            if (mapState[y][x] == TILE_BASE) {
+            if (mapState[y][x] == TILE_FLOOR) {
                 rightmost = x;
                 break;
             }
@@ -610,6 +818,7 @@ bool PlayScene::CheckTileFloor(int x, int y) {
 
 // not sure about the remove logic
 int PlayScene::RemoveTurretAt(int x, int y) {
+    Engine::LOG(Engine::DEBUGGING) << "start RemoveTurretAt";
     Engine::LOG(Engine::DEBUGGING) << "=== TowerGroup contents ===";
     int idx = 0;
     int tp = 0;
@@ -635,18 +844,27 @@ int PlayScene::RemoveTurretAt(int x, int y) {
 
 
     // Find the turret at this position
-    // for (auto it = TowerGroup->GetObjects().rbegin(); it != TowerGroup->GetObjects().rend(); --it) {
-    for ( auto it : TowerGroup->GetObjects() ) {
-        Turret* turret = dynamic_cast<Turret*>(it);
-        if (turret && std::abs(turret->Position.x - px) < 1e-3 && std::abs(turret->Position.y - py) < 1e-3 ) {
-            Engine::LOG(Engine::DEBUGGING) << "inside delete";
+    for (auto it = TowerGroup->GetObjects().begin(); it != TowerGroup->GetObjects().end(); ++it) {
+        Turret* turret = dynamic_cast<Turret*>(*it);
+        if (turret && std::abs(turret->Position.x - px) < 1e-3 && std::abs(turret->Position.y - py) < 1e-3) {
             tp = turret->GetType();
+            turret->GetObjectIterator()->first = false;
             TowerGroup->RemoveObject(turret->GetObjectIterator());
-            mapState[y][x] = TILE_FLOOR; // Mark the tile as empty
+            mapState[y][x] = TILE_FLOOR;
             break;
         }
-        Engine::LOG(Engine::DEBUGGING) << "finish delete";
     }
+    // for ( auto it : TowerGroup->GetObjects() ) {
+    //     Turret* turret = dynamic_cast<Turret*>(it);
+    //     if (turret && std::abs(turret->Position.x - px) < 1e-3 && std::abs(turret->Position.y - py) < 1e-3 ) {
+    //         Engine::LOG(Engine::DEBUGGING) << "inside delete";
+    //         tp = turret->GetType();
+    //         it = TowerGroup->RemoveObject(turret->GetObjectIterator());
+    //         mapState[y][x] = TILE_FLOOR; // Mark the tile as empty
+    //         break;
+    //     }
+    //     Engine::LOG(Engine::DEBUGGING) << "finish delete";
+    // }
     Engine::LOG(Engine::DEBUGGING) << "finish remove";
     Engine::LOG(Engine::DEBUGGING) << "=== TowerGroup contents ===";
     idx = 0;

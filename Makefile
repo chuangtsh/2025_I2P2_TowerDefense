@@ -1,5 +1,5 @@
-C := gcc-14
-CXX := g++-14
+C := gcc
+CXX := g++
 SOURCE_DIR := $(CURDIR)
 BUILD_DIR := $(CURDIR)/build
 PROJECT_NAME := 2025_I2P2_TowerDefense

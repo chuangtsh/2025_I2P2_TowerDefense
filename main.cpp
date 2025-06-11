@@ -1,6 +1,8 @@
 // [main.cpp]
 // This is the entry point of your game.
 // You can register your scenes here, and start the game.
+#include <csignal>
+#include <iostream>
 #include "Engine/GameEngine.hpp"
 #include "Engine/LOG.hpp"
 #include "Scene/LoseScene.hpp"
@@ -11,8 +13,9 @@
 #include "Scene/SettingsScene.hpp"
 #include "Scene/ScoreboardScene.hpp"
 
+
 int main(int argc, char **argv) {
-	// Engine::LOG::SetConfig(true); // no output verbose
+    // Engine::LOG::SetConfig(true); // no output verbose
 	Engine::LOG::SetConfig(true, true); // can output verbose(i.e. keyboard, mouse)
 
 	Engine::GameEngine& game = Engine::GameEngine::GetInstance();

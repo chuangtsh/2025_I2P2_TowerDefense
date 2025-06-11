@@ -19,12 +19,6 @@ namespace Engine {
 
 class PlayScene final : public Engine::IScene {
 private:
-    enum TileType {
-        TILE_FLOOR,
-        TILE_BASE,
-        TILE_TURRET,
-        TILE_TURRET_SIBLING
-    };
     ALLEGRO_SAMPLE_ID bgmId;
     std::shared_ptr<ALLEGRO_SAMPLE_INSTANCE> deathBGMInstance;
 
@@ -34,6 +28,12 @@ protected:
     int SpeedMult;
 
 public:
+    enum TileType {
+        TILE_FLOOR,
+        TILE_BASE,
+        TILE_TURRET,
+        TILE_TURRET_SIBLING
+    };
     static bool DebugMode;
     static const std::vector<Engine::Point> directions;
     static const int MapWidth, MapHeight;
@@ -62,6 +62,8 @@ public:
     std::vector<std::vector<TileType>> mapState;
     std::vector<std::vector<int>> mapDistance;
     std::list<std::pair<int, float>> enemyWaveData;
+    std::list<int> enemyWaveColumn;
+    // Column is 0-based
     std::list<int> keyStrokes;
     static Engine::Point GetClientSize();
     explicit PlayScene() = default;
